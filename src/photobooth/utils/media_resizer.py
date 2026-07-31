@@ -9,6 +9,8 @@ from PIL import Image, ImageOps, ImageSequence
 from simplejpeg import decode_jpeg, decode_jpeg_header, encode_jpeg
 from typing_extensions import deprecated
 
+from photobooth.services.backends.utils.rotate_exif import _sanitize_exif_types
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,7 +63,9 @@ def resize_jpeg_simplejpeg(filepath_in: Path, filepath_out: Path, scaled_min_len
 
     # transplanting the exif data to newly produced output because we use the orientation tag to rotate without encoding.
     # same as pillow exif_transpose
-    piexif.insert(piexif.dump(piexif.load(str(filepath_in))), str(filepath_out))
+    exif_dict = piexif.load(str(filepath_in))
+    _sanitize_exif_types(exif_dict)
+    piexif.insert(piexif.dump(exif_dict), str(filepath_out))
 
 
 def resize_jpeg(filepath_in: Path, filepath_out: Path, scaled_min_length: int):
