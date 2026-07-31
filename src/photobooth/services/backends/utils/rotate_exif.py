@@ -62,7 +62,6 @@ def _sanitize_exif_types(exif_dict: dict) -> dict:
             if not isinstance(value, accepted_types):
                 try:
                     ifd[tag_id] = converter(value)
-                    logger.debug(f"exif type coercion: tag {tag_id} in {ifd_name} IFD: {type(value).__name__} -> {type(ifd[tag_id]).__name__}")
                 except Exception:
                     logger.warning(f"exif type coercion failed: tag {tag_id} in {ifd_name} IFD has type {type(value).__name__}, expected {accepted_types}. Removing tag.")
                     del ifd[tag_id]
