@@ -188,6 +188,7 @@ class Gphoto2Backend(AbstractBackend):
         assert gp
 
         preview_failcounter = 0
+        _preview_supported = True
 
         while not self._stop_event.is_set():  # repeat until stopped
             with self._hires_lock:
@@ -289,6 +290,10 @@ class Gphoto2Backend(AbstractBackend):
             else:
                 # lores/preview stream
 
+                if not _preview_supported:
+                    time.sleep(0.5)
+                    continue
+
                 self._mode_machine.process_switchmode()
 
                 if self._mode_machine.active_mode == "standby":
@@ -310,6 +315,29 @@ class Gphoto2Backend(AbstractBackend):
                         self._lores_data[0].data = img_bytes
                         self._lores_data[0].condition.notify_all()
 
+                except gp.GPhoto2Error as exc:
+                    if exc.code == gp.GP_ERROR_NOT_SUPPORTED:
+                        logger.warning(f"camera does not support live preview ({exc}), disabling preview stream")
+                        _preview_supported = False
+                        continue
+
+                    preview_failcounter += 1
+
+                    if preview_failcounter <= 10:
+                        logger.warning(f"error capturing frame from DSLR: {exc}")
+                        # abort this loop iteration and continue sleeping...
+                        time.sleep(0.5)  # add another delay to avoid flooding logs
+
+                        continue
+                    else:
+                        logger.critical(f"aborting capturing frame, camera disconnected? retry to connect {exc}")
+                        try:
+                            self._camera.exit()
+                        except Exception:
+                            pass  # fail in silence, because things got already wrong. this one is just to try to cleanup, might help or not...
+
+                        # stop device requested by leaving worker loop, so supvervisor can restart
+                        raise RuntimeError(f"Error communicating with the camera: {exc}") from exc
                 except Exception as exc:
                     preview_failcounter += 1
 
